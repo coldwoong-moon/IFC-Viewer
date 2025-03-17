@@ -12,6 +12,7 @@
   "dependencies": {
     "@thatopen/components": "^2.4.4",
     "@thatopen/components-front": "^2.4.4",
+    "@thatopen/fragments": "^2.4.0",
     "@thatopen/ui": "^2.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
