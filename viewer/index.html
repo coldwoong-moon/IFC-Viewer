@@ -22,16 +22,13 @@
             <div class="header-controls">
                 <input type="file" id="fileInput" accept=".chd,.ifc" style="display: none;">
                 <input type="file" id="folderInput" webkitdirectory style="display: none;">
-                <button id="loadFileBtn" class="btn btn-primary">Load CHD/IFC File</button>
-                <button id="loadFolderBtn" class="btn btn-primary">Load CHD Folder</button>
-                <select id="serverFileSelect" class="server-file-select">
-                    <option value="">Choose Server CHD File...</option>
-                    <option value="/Users/coldwoong/Downloads/IFC/test2.chd">Test2 IFC Building</option>
-                    <option value="/Users/coldwoong/SIDE-PROJECT/new-bim-format/examples/demo/demo-building.chd">Demo Building</option>
-                    <option value="/Users/coldwoong/SIDE-PROJECT/new-bim-format/examples/sample-from-json.chd">Sample Building</option>
-                    <option value="/Users/coldwoong/SIDE-PROJECT/new-bim-format/examples/simple/simple-building.chd">Simple Building</option>
+                <button id="loadFileBtn" class="btn btn-primary">Upload CHD/IFC File</button>
+                <button id="loadFolderBtn" class="btn btn-primary">Upload CHD Folder</button>
+                <button id="refreshProjectsBtn" class="btn btn-secondary">🔄 Refresh</button>
+                <select id="projectSelect" class="project-select">
+                    <option value="">Choose CHD Project...</option>
                 </select>
-                <button id="loadServerBtn" class="btn btn-secondary">Load Selected</button>
+                <button id="loadProjectBtn" class="btn btn-primary">Load Project</button>
                 <div class="file-info" id="fileInfo" style="display: none;">
                     <span id="fileName"></span>
                     <span id="fileStats"></span>

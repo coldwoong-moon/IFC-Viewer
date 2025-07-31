@@ -70,22 +70,22 @@ body {
     background: #5A5A5C;
 }
 
-.server-file-select {
+.project-select {
     padding: 8px 12px;
     border: 1px solid #444;
     border-radius: 6px;
     background: #2d2d2d;
     color: #ffffff;
     font-size: 14px;
-    min-width: 200px;
+    min-width: 300px;
     cursor: pointer;
 }
 
-.server-file-select:hover {
+.project-select:hover {
     border-color: #666;
 }
 
-.server-file-select:focus {
+.project-select:focus {
     outline: none;
     border-color: #007AFF;
 }

@@ -7,8 +7,9 @@ export class UIController {
         this.elements = {
             loadFileBtn: document.getElementById('loadFileBtn'),
             loadFolderBtn: document.getElementById('loadFolderBtn'),
-            loadServerBtn: document.getElementById('loadServerBtn'),
-            serverFileSelect: document.getElementById('serverFileSelect'),
+            refreshProjectsBtn: document.getElementById('refreshProjectsBtn'),
+            projectSelect: document.getElementById('projectSelect'),
+            loadProjectBtn: document.getElementById('loadProjectBtn'),
             fileInput: document.getElementById('fileInput'),
             folderInput: document.getElementById('folderInput'),
             fileInfo: document.getElementById('fileInfo'),
@@ -75,12 +76,17 @@ export class UIController {
             }
         });
 
-        this.elements.loadServerBtn.addEventListener('click', () => {
-            const selectedFile = this.elements.serverFileSelect.value;
-            if (selectedFile && this.onLoadServerFile) {
-                this.onLoadServerFile(selectedFile);
-            } else if (!selectedFile) {
-                alert('Please select a CHD file from the dropdown first.');
+        // Project management
+        this.elements.refreshProjectsBtn.addEventListener('click', () => {
+            this.loadProjectList();
+        });
+
+        this.elements.loadProjectBtn.addEventListener('click', () => {
+            const selectedProject = this.elements.projectSelect.value;
+            if (selectedProject && this.onLoadProject) {
+                this.onLoadProject(selectedProject);
+            } else if (!selectedProject) {
+                alert('Please select a CHD project from the dropdown first.');
             }
         });
 
@@ -469,5 +475,66 @@ export class UIController {
         }, 5000);
         
         console.log('Conversion info displayed:', conversionInfo);
+    }
+
+    // Project management methods
+    async loadProjectList() {
+        try {
+            console.log('🔄 Loading CHD project list...');
+            const response = await fetch('/api/projects');
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to load projects');
+            }
+            
+            this.updateProjectSelect(data.projects);
+            console.log(`✅ Loaded ${data.projects.length} CHD projects`);
+            
+        } catch (error) {
+            console.error('Failed to load project list:', error);
+            this.showError(`Failed to load projects: ${error.message}`);
+        }
+    }
+
+    updateProjectSelect(projects) {
+        const select = this.elements.projectSelect;
+        
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">Choose CHD Project...</option>';
+        
+        if (projects.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No CHD projects found';
+            option.disabled = true;
+            select.appendChild(option);
+            return;
+        }
+        
+        // Add project options
+        projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.name;
+            
+            const projectName = project.manifest?.project?.name || project.name.replace('.chd', '');
+            const elementCount = project.manifest?.statistics?.total_elements || 0;
+            const memoryInfo = project.statistics?.memoryFormatted || '';
+            
+            option.textContent = `${projectName} (${elementCount} elements, ${memoryInfo})`;
+            option.title = `
+Source: ${project.manifest?.source?.originalFile || 'Unknown'}
+Created: ${project.manifest?.source?.conversionTime || 'Unknown'}
+Size: ${project.statistics?.sizeFormatted || 'Unknown'}
+Memory: ${project.statistics?.memoryFormatted || 'Unknown'}
+            `.trim();
+            
+            select.appendChild(option);
+        });
+    }
+
+    // Initialize project list on startup
+    init() {
+        this.loadProjectList();
     }
 }

@@ -35,8 +35,9 @@ class ViewerApp {
 
             console.log('CHD Viewer initialized successfully');
 
-            // Auto-load test model on startup
+            // Initialize UI (load project list) and then load test model
             setTimeout(() => {
+                this.ui.init(); // Load CHD project list
                 this.loadTestModel();
             }, 1000);
 
@@ -49,7 +50,7 @@ class ViewerApp {
     setupEventHandlers() {
         // UI to app communication
         this.ui.onLoadFile = (file) => this.loadFile(file);
-        this.ui.onLoadServerFile = (filePath) => this.loadServerFile(filePath);
+        this.ui.onLoadProject = (projectName) => this.loadProject(projectName);
         this.ui.onElementSelect = (elementId) => this.selectElement(elementId);
         this.ui.onResetView = () => this.renderer.resetCamera();
         this.ui.onFitView = () => this.renderer.fitCameraToScene();
@@ -97,6 +98,47 @@ class ViewerApp {
         } catch (error) {
             console.error('Failed to load server file:', error);
             this.ui.showError('Failed to load server file: ' + error.message);
+        } finally {
+            this.ui.hideLoading();
+        }
+    }
+
+    async loadProject(projectName) {
+        try {
+            this.ui.showLoading(`Loading CHD project: ${projectName}...`);
+
+            console.log(`📂 Loading CHD project: ${projectName}`);
+
+            const response = await fetch('/api/load-project', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ projectName })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Failed to load project: ${response.status}`);
+            }
+
+            const model = await response.json();
+            console.log(`📦 CHD project loaded:`, model.projectInfo);
+
+            await this.displayModel(model, projectName);
+
+            // Show project info if available
+            if (model.projectInfo && model.projectInfo.manifest.source) {
+                this.ui.updateFileInfo(projectName, {
+                    ...model.statistics,
+                    projectInfo: model.projectInfo,
+                    conversionInfo: model.projectInfo.manifest.source
+                });
+            }
+
+        } catch (error) {
+            console.error('Failed to load CHD project:', error);
+            this.ui.showError(`Failed to load CHD project: ${error.message}`);
         } finally {
             this.ui.hideLoading();
         }

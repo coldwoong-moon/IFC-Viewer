@@ -126,12 +126,13 @@ app.post('/api/upload-chd', upload.fields([
             
             let finalFilePath = uploadedFilePath;
             
-            // IFC 파일이면 CHD로 변환
+            // IFC 파일이면 CHD 프로젝트 폴더로 변환
             if (originalName.endsWith('.ifc')) {
-                console.log(`🔄 IFC file detected: ${uploadedFile.originalname}, converting to CHD...`);
+                console.log(`🔄 IFC file detected: ${uploadedFile.originalname}, converting to CHD project...`);
                 try {
-                    finalFilePath = await convertIFCtoCHD(uploadedFilePath, uploadedFile.originalname);
-                    console.log(`✅ IFC conversion successful: ${finalFilePath}`);
+                    const projectPath = await convertIFCtoCHDProject(uploadedFilePath, uploadedFile.originalname);
+                    console.log(`✅ IFC conversion successful: ${projectPath}`);
+                    finalFilePath = projectPath;
                 } catch (conversionError) {
                     console.error(`❌ IFC conversion failed:`, conversionError.message);
                     throw conversionError;
@@ -144,12 +145,18 @@ app.post('/api/upload-chd', upload.fields([
             
             // Clean up uploaded files
             fs.unlinkSync(uploadedFilePath);
+            
+            // CHD 프로젝트는 보존하고 임시 파일만 정리
             if (finalFilePath !== uploadedFilePath && fs.existsSync(finalFilePath)) {
-                // CHD 변환 파일 정리 (디렉토리인 경우)
-                if (fs.statSync(finalFilePath).isDirectory()) {
-                    await fs.promises.rm(finalFilePath, { recursive: true, force: true });
+                // 프로젝트 폴더가 아닌 임시 파일만 삭제
+                if (!finalFilePath.includes('/projects/')) {
+                    if (fs.statSync(finalFilePath).isDirectory()) {
+                        await fs.promises.rm(finalFilePath, { recursive: true, force: true });
+                    } else {
+                        fs.unlinkSync(finalFilePath);
+                    }
                 } else {
-                    fs.unlinkSync(finalFilePath);
+                    console.log(`🗄️  CHD 프로젝트 보존됨: ${finalFilePath}`);
                 }
             }
             
@@ -294,7 +301,98 @@ app.post('/api/upload-ifc', upload.single('ifcFile'), async (req, res) => {
     }
 });
 
-// Helper function to convert IFC to CHD
+// API endpoint to list CHD projects
+app.get('/api/projects', async (req, res) => {
+    try {
+        const projectsDir = path.join(__dirname, 'projects');
+        
+        if (!fs.existsSync(projectsDir)) {
+            return res.json({ projects: [] });
+        }
+        
+        const projects = [];
+        const items = await fs.promises.readdir(projectsDir, { withFileTypes: true });
+        
+        for (const item of items) {
+            if (item.isDirectory() && item.name.endsWith('.chd')) {
+                const projectPath = path.join(projectsDir, item.name);
+                const manifestPath = path.join(projectPath, 'manifest.json');
+                
+                if (fs.existsSync(manifestPath)) {
+                    try {
+                        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
+                        const stats = await getProjectStatistics(projectPath);
+                        
+                        projects.push({
+                            name: item.name,
+                            path: projectPath,
+                            manifest: manifest,
+                            statistics: stats,
+                            lastModified: (await fs.promises.stat(projectPath)).mtime
+                        });
+                    } catch (error) {
+                        console.error(`Error reading project ${item.name}:`, error.message);
+                    }
+                }
+            }
+        }
+        
+        // 최근 수정된 순서로 정렬
+        projects.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+        
+        res.json({ projects });
+        
+    } catch (error) {
+        console.error('Failed to list projects:', error);
+        res.status(500).json({ error: 'Failed to list projects' });
+    }
+});
+
+// API endpoint to load CHD project
+app.post('/api/load-project', async (req, res) => {
+    try {
+        const { projectName } = req.body;
+        
+        if (!projectName) {
+            return res.status(400).json({ error: 'Project name is required' });
+        }
+        
+        const projectPath = path.join(__dirname, 'projects', projectName);
+        const manifestPath = path.join(projectPath, 'manifest.json');
+        
+        if (!fs.existsSync(projectPath) || !fs.existsSync(manifestPath)) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        
+        console.log(`📂 Loading CHD project: ${projectName}`);
+        
+        // CHD 프로젝트 로딩
+        const webModel = await processCHDFile(projectPath);
+        
+        // manifest.json 정보 추가
+        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
+        const projectStats = await getProjectStatistics(projectPath);
+        
+        res.json({
+            ...webModel,
+            projectInfo: {
+                name: projectName,
+                manifest: manifest,
+                statistics: projectStats,
+                loadedFrom: 'CHD_PROJECT'
+            }
+        });
+        
+    } catch (error) {
+        console.error('Failed to load CHD project:', error);
+        res.status(500).json({ 
+            error: error.message,
+            stack: error.stack 
+        });
+    }
+});
+
+// Helper function to convert IFC to CHD (temporary)
 async function convertIFCtoCHD(ifcFilePath, originalName) {
     const converter = new IFCToCHDConverter({ verbose: false });
     
@@ -302,8 +400,6 @@ async function convertIFCtoCHD(ifcFilePath, originalName) {
     const tempChdDir = path.join(__dirname, 'uploads', `temp_${Date.now()}_${path.basename(originalName, '.ifc')}.chd`);
     
     try {
-        // IFC → CHD 변환 시작
-        
         // IFC → CHD 변환 실행
         const result = await converter.convert(ifcFilePath, tempChdDir, {
             chunkSize: 100,
@@ -322,6 +418,138 @@ async function convertIFCtoCHD(ifcFilePath, originalName) {
         }
         throw new Error(`IFC conversion failed: ${error.message}`);
     }
+}
+
+// Helper function to convert IFC to CHD project (persistent)
+async function convertIFCtoCHDProject(ifcFilePath, originalName) {
+    const converter = new IFCToCHDConverter({ verbose: false });
+    
+    // IFC 파일과 같은 이름의 CHD 프로젝트 폴더 생성
+    const baseFileName = path.basename(originalName, '.ifc');
+    const projectDir = path.join(__dirname, 'projects', `${baseFileName}.chd`);
+    
+    // 프로젝트 디렉토리 확인 및 생성
+    const projectsDir = path.join(__dirname, 'projects');
+    if (!fs.existsSync(projectsDir)) {
+        await fs.promises.mkdir(projectsDir, { recursive: true });
+    }
+    
+    try {
+        console.log(`🏗️  Creating CHD project: ${projectDir}`);
+        
+        // IFC → CHD 변환 실행
+        const result = await converter.convert(ifcFilePath, projectDir, {
+            chunkSize: 100,
+            compression: 'zlib',
+            compressionLevel: 6,
+            extractColors: true // IFC 색상 정보 추출 활성화
+        });
+        
+        // manifest.json에 추가 정보 기록
+        const manifestPath = path.join(projectDir, 'manifest.json');
+        if (fs.existsSync(manifestPath)) {
+            const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
+            
+            // 변환 정보 추가
+            manifest.source = {
+                originalFile: originalName,
+                convertedFrom: 'IFC',
+                conversionTime: new Date().toISOString(),
+                conversionSettings: {
+                    chunkSize: 100,
+                    compression: 'zlib',
+                    compressionLevel: 6,
+                    extractColors: true
+                }
+            };
+            
+            // 메모리 사용량 정보 추가
+            const stats = await getProjectStatistics(projectDir);
+            manifest.statistics = {
+                ...manifest.statistics,
+                ...stats
+            };
+            
+            await fs.promises.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+        }
+        
+        console.log(`✅ CHD 프로젝트 생성 완료: ${result.totalElements}개 요소`);
+        console.log(`📁 프로젝트 경로: ${projectDir}`);
+        
+        return projectDir;
+        
+    } catch (error) {
+        console.error('IFC to CHD project conversion failed:', error);
+        // 실패 시 프로젝트 디렉토리 정리
+        if (fs.existsSync(projectDir)) {
+            await fs.promises.rm(projectDir, { recursive: true, force: true });
+        }
+        throw new Error(`IFC project conversion failed: ${error.message}`);
+    }
+}
+
+// Helper function to get project statistics  
+async function getProjectStatistics(projectDir) {
+    try {
+        const stats = { 
+            fileCount: 0, 
+            totalSize: 0, 
+            memoryUsage: 0,
+            directories: []
+        };
+        
+        // 재귀적으로 모든 파일 크기 계산
+        async function calculateDirSize(dirPath) {
+            const items = await fs.promises.readdir(dirPath, { withFileTypes: true });
+            
+            for (const item of items) {
+                const fullPath = path.join(dirPath, item.name);
+                
+                if (item.isDirectory()) {
+                    stats.directories.push(item.name);
+                    await calculateDirSize(fullPath);
+                } else {
+                    const fileStat = await fs.promises.stat(fullPath);
+                    stats.fileCount++;
+                    stats.totalSize += fileStat.size;
+                }
+            }
+        }
+        
+        await calculateDirSize(projectDir);
+        
+        // 메모리 사용량 추정 (압축 해제 시 약 2-3배)
+        stats.memoryUsage = Math.round(stats.totalSize * 2.5);
+        
+        return {
+            projectSize: stats.totalSize,
+            estimatedMemoryUsage: stats.memoryUsage,
+            fileCount: stats.fileCount,
+            directories: stats.directories,
+            sizeFormatted: formatFileSize(stats.totalSize),
+            memoryFormatted: formatFileSize(stats.memoryUsage)
+        };
+        
+    } catch (error) {
+        console.error('Error calculating project statistics:', error);
+        return {
+            projectSize: 0,
+            estimatedMemoryUsage: 0,
+            fileCount: 0,
+            directories: [],
+            sizeFormatted: '0 bytes',
+            memoryFormatted: '0 bytes'
+        };
+    }
+}
+
+// Helper function to format file sizes
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 bytes';
+    const k = 1024;
+    const sizes = ['bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
 // Helper function to process CHD files
@@ -382,7 +610,10 @@ app.listen(PORT, () => {
     console.log(`🏗️  CHD Viewer Server running at http://localhost:${PORT}`);
     console.log(`📁 Serving files from: ${__dirname}`);
     console.log(`🔗 API endpoints:`);
-    console.log(`   POST /api/load-chd - Load CHD file`);
+    console.log(`   POST /api/upload-chd - Upload and process CHD/IFC files`);
+    console.log(`   POST /api/load-chd - Load CHD file from server`);
+    console.log(`   GET  /api/projects - List CHD projects`);
+    console.log(`   POST /api/load-project - Load CHD project`);
     console.log(`\n🌐 Open http://localhost:${PORT} to view the CHD viewer`);
 });
 
