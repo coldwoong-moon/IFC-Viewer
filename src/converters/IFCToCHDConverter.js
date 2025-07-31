@@ -381,15 +381,23 @@ export class IFCToCHDConverter {
         dimensions = [1000, 1000, 1000]; // 1m cube
     }
     
-    // Create box vertices
+    // Create box vertices in IFC coordinate system
     const [w, h, d] = dimensions.map(d => d / 2); // Half dimensions
     
-    const vertices = [
+    const ifcVertices = [
       // Bottom face
       [-w, -h, -d], [w, -h, -d], [w, h, -d], [-w, h, -d],
       // Top face  
       [-w, -h, d], [w, -h, d], [w, h, d], [-w, h, d]
     ];
+    
+    // Apply coordinate system transformation from IFC Z-up to Three.js Y-up
+    // IFC (X, Y, Z) → Three.js (X, Z, -Y)
+    const vertices = ifcVertices.map(([x, y, z]) => [
+      x,   // X stays X
+      z,   // Z becomes Y (up axis)
+      -y   // Y becomes -Z (depth axis, negated)
+    ]);
     
     const faces = [
       // Bottom
@@ -511,16 +519,23 @@ export class IFCToCHDConverter {
   }
 
   /**
-   * Transform point by matrix
+   * Transform point by matrix and convert from IFC Z-up to Three.js Y-up coordinate system
    */
   transformPoint(point, matrix) {
     const [x, y, z] = point;
-    const result = [
+    const transformedPoint = [
       matrix[0][0] * x + matrix[0][1] * y + matrix[0][2] * z + matrix[0][3],
       matrix[1][0] * x + matrix[1][1] * y + matrix[1][2] * z + matrix[1][3],
       matrix[2][0] * x + matrix[2][1] * y + matrix[2][2] * z + matrix[2][3]
     ];
-    return result;
+    
+    // Convert from IFC Z-up coordinate system to Three.js Y-up coordinate system
+    // IFC (X, Y, Z) → Three.js (X, Z, -Y)
+    return [
+      transformedPoint[0],  // X stays X
+      transformedPoint[2],  // Z becomes Y (up axis)
+      -transformedPoint[1]  // Y becomes -Z (depth axis, negated)
+    ];
   }
 
   /**

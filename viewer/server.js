@@ -301,52 +301,81 @@ app.post('/api/upload-ifc', upload.single('ifcFile'), async (req, res) => {
     }
 });
 
+// Store registry of CHD project locations
+const chdProjectRegistry = new Map();
+
 // API endpoint to list CHD projects
 app.get('/api/projects', async (req, res) => {
     try {
-        const projectsDir = path.join(__dirname, 'projects');
+        const projects = [];
         
-        if (!fs.existsSync(projectsDir)) {
-            return res.json({ projects: [] });
+        // Scan default projects directory
+        const projectsDir = path.join(__dirname, 'projects');
+        if (fs.existsSync(projectsDir)) {
+            await scanProjectsInDirectory(projectsDir, projects);
         }
         
-        const projects = [];
-        const items = await fs.promises.readdir(projectsDir, { withFileTypes: true });
-        
-        for (const item of items) {
-            if (item.isDirectory() && item.name.endsWith('.chd')) {
-                const projectPath = path.join(projectsDir, item.name);
-                const manifestPath = path.join(projectPath, 'manifest.json');
-                
-                if (fs.existsSync(manifestPath)) {
-                    try {
-                        const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
-                        const stats = await getProjectStatistics(projectPath);
-                        
-                        projects.push({
-                            name: item.name,
-                            path: projectPath,
-                            manifest: manifest,
-                            statistics: stats,
-                            lastModified: (await fs.promises.stat(projectPath)).mtime
-                        });
-                    } catch (error) {
-                        console.error(`Error reading project ${item.name}:`, error.message);
-                    }
-                }
+        // Scan registered project locations (from IFC conversions)
+        for (const [projectName, projectPath] of chdProjectRegistry) {
+            if (fs.existsSync(projectPath)) {
+                await addProjectFromPath(projectPath, projects);
             }
         }
         
-        // 최근 수정된 순서로 정렬
-        projects.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+        // Remove duplicates based on project path
+        const uniqueProjects = projects.filter((project, index, self) => 
+            index === self.findIndex(p => p.path === project.path)
+        );
         
-        res.json({ projects });
+        // 최근 수정된 순서로 정렬
+        uniqueProjects.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+        
+        res.json({ projects: uniqueProjects });
         
     } catch (error) {
         console.error('Failed to list projects:', error);
         res.status(500).json({ error: 'Failed to list projects' });
     }
 });
+
+// Helper function to scan projects in a directory
+async function scanProjectsInDirectory(directory, projects) {
+    try {
+        const items = await fs.promises.readdir(directory, { withFileTypes: true });
+        
+        for (const item of items) {
+            if (item.isDirectory() && item.name.endsWith('.chd')) {
+                const projectPath = path.join(directory, item.name);
+                await addProjectFromPath(projectPath, projects);
+            }
+        }
+    } catch (error) {
+        console.error(`Error scanning directory ${directory}:`, error.message);
+    }
+}
+
+// Helper function to add project from path
+async function addProjectFromPath(projectPath, projects) {
+    const manifestPath = path.join(projectPath, 'manifest.json');
+    
+    if (fs.existsSync(manifestPath)) {
+        try {
+            const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
+            const stats = await getProjectStatistics(projectPath);
+            
+            projects.push({
+                name: path.basename(projectPath),
+                path: projectPath,
+                manifest: manifest,
+                statistics: stats,
+                lastModified: (await fs.promises.stat(projectPath)).mtime,
+                location: path.dirname(projectPath) // Track the directory location
+            });
+        } catch (error) {
+            console.error(`Error reading project ${projectPath}:`, error.message);
+        }
+    }
+}
 
 // API endpoint to load CHD project
 app.post('/api/load-project', async (req, res) => {
@@ -357,14 +386,21 @@ app.post('/api/load-project', async (req, res) => {
             return res.status(400).json({ error: 'Project name is required' });
         }
         
-        const projectPath = path.join(__dirname, 'projects', projectName);
+        // Try to find project in registered locations first
+        let projectPath = chdProjectRegistry.get(projectName);
+        
+        // Fall back to default projects directory if not found in registry
+        if (!projectPath || !fs.existsSync(projectPath)) {
+            projectPath = path.join(__dirname, 'projects', projectName);
+        }
+        
         const manifestPath = path.join(projectPath, 'manifest.json');
         
         if (!fs.existsSync(projectPath) || !fs.existsSync(manifestPath)) {
             return res.status(404).json({ error: 'Project not found' });
         }
         
-        console.log(`📂 Loading CHD project: ${projectName}`);
+        console.log(`📂 Loading CHD project: ${projectName} from ${projectPath}`);
         
         // CHD 프로젝트 로딩
         const webModel = await processCHDFile(projectPath);
@@ -424,18 +460,15 @@ async function convertIFCtoCHD(ifcFilePath, originalName) {
 async function convertIFCtoCHDProject(ifcFilePath, originalName) {
     const converter = new IFCToCHDConverter({ verbose: false });
     
-    // IFC 파일과 같은 이름의 CHD 프로젝트 폴더 생성
+    // IFC 파일과 같은 디렉토리에 CHD 프로젝트 폴더 생성
     const baseFileName = path.basename(originalName, '.ifc');
-    const projectDir = path.join(__dirname, 'projects', `${baseFileName}.chd`);
+    const ifcDir = path.dirname(ifcFilePath);
+    const projectDir = path.join(ifcDir, `${baseFileName}.chd`);
     
-    // 프로젝트 디렉토리 확인 및 생성
-    const projectsDir = path.join(__dirname, 'projects');
-    if (!fs.existsSync(projectsDir)) {
-        await fs.promises.mkdir(projectsDir, { recursive: true });
-    }
+    // 프로젝트 디렉토리 확인 및 생성 (IFC 파일과 같은 위치)
     
     try {
-        console.log(`🏗️  Creating CHD project: ${projectDir}`);
+        console.log(`🏗️  Creating CHD project in same directory as IFC: ${projectDir}`);
         
         // IFC → CHD 변환 실행
         const result = await converter.convert(ifcFilePath, projectDir, {
@@ -475,6 +508,11 @@ async function convertIFCtoCHDProject(ifcFilePath, originalName) {
         
         console.log(`✅ CHD 프로젝트 생성 완료: ${result.totalElements}개 요소`);
         console.log(`📁 프로젝트 경로: ${projectDir}`);
+        
+        // Register the new CHD project location for project listing
+        const projectName = path.basename(projectDir);
+        chdProjectRegistry.set(projectName, projectDir);
+        console.log(`📋 Registered CHD project: ${projectName} at ${projectDir}`);
         
         return projectDir;
         
