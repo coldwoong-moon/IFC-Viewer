@@ -1,0 +1,37 @@
+{
+  "name": "chd-format",
+  "version": "0.1.0",
+  "description": "Construction Hybrid Data (CHD) format for efficient BIM and CAD data storage",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/**/*.test.js",
+    "dev": "node --watch src/index.js",
+    "build": "node scripts/build.js",
+    "convert": "node tools/converters/index.js",
+    "serve": "node tools/viewers/server.js",
+    "viewer": "node viewer/server.js"
+  },
+  "keywords": [
+    "BIM",
+    "CAD",
+    "construction",
+    "3D",
+    "format",
+    "parsing"
+  ],
+  "author": "CHD Format Team",
+  "license": "MIT",
+  "dependencies": {
+    "cbor-x": "^1.5.6",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

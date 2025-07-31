@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHD & IFC 3D Viewer</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗️</text></svg>">
+    <link rel="stylesheet" href="css/viewer.css">
+    
+    <!-- Three.js -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- CBOR decoder -->
+    <script src="https://cdn.jsdelivr.net/npm/cbor-x@1.5.6/dist/index.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>🏗️ CHD & IFC 3D Viewer</h1>
+            <div class="header-controls">
+                <input type="file" id="fileInput" accept=".chd,.ifc" style="display: none;">
+                <input type="file" id="folderInput" webkitdirectory style="display: none;">
+                <button id="loadFileBtn" class="btn btn-primary">Load CHD/IFC File</button>
+                <button id="loadFolderBtn" class="btn btn-primary">Load CHD Folder</button>
+                <select id="serverFileSelect" class="server-file-select">
+                    <option value="">Choose Server CHD File...</option>
+                    <option value="/Users/coldwoong/Downloads/IFC/test2.chd">Test2 IFC Building</option>
+                    <option value="/Users/coldwoong/SIDE-PROJECT/new-bim-format/examples/demo/demo-building.chd">Demo Building</option>
+                    <option value="/Users/coldwoong/SIDE-PROJECT/new-bim-format/examples/sample-from-json.chd">Sample Building</option>
+                    <option value="/Users/coldwoong/SIDE-PROJECT/new-bim-format/examples/simple/simple-building.chd">Simple Building</option>
+                </select>
+                <button id="loadServerBtn" class="btn btn-secondary">Load Selected</button>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <span id="fileName"></span>
+                    <span id="fileStats"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <!-- 3D Viewport -->
+            <div class="viewport-container">
+                <canvas id="viewport"></canvas>
+                
+                <!-- Loading overlay -->
+                <div id="loadingOverlay" class="loading-overlay">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Loading model...</div>
+                    <div class="loading-progress">
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill"></div>
+                        </div>
+                        <div id="progressText" class="progress-text">0%</div>
+                    </div>
+                </div>
+
+                <!-- Viewport controls -->
+                <div class="viewport-controls">
+                    <button id="resetViewBtn" class="control-btn" title="Reset View">🏠</button>
+                    <button id="fitViewBtn" class="control-btn" title="Fit to View">📐</button>
+                    <button id="wireframeBtn" class="control-btn" title="Toggle Wireframe">🔗</button>
+                    <button id="fullscreenBtn" class="control-btn" title="Fullscreen">⛶</button>
+                </div>
+
+                <!-- View info -->
+                <div class="view-info">
+                    <div id="cameraInfo">Camera: Perspective</div>
+                    <div id="performanceInfo">FPS: --</div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Model Info Panel -->
+                <div class="panel">
+                    <h3>📊 Model Information</h3>
+                    <div id="modelInfo" class="info-content">
+                        <p>No model loaded</p>
+                    </div>
+                </div>
+
+                <!-- Element List Panel -->
+                <div class="panel">
+                    <h3>🧱 Elements</h3>
+                    <div class="element-filters">
+                        <select id="elementTypeFilter">
+                            <option value="">All Types</option>
+                            <option value="beam">Beams</option>
+                            <option value="column">Columns</option>
+                            <option value="slab">Slabs</option>
+                            <option value="wall">Walls</option>
+                        </select>
+                        <input type="text" id="elementSearch" placeholder="Search elements...">
+                    </div>
+                    <div id="elementList" class="element-list">
+                        <p>No elements to display</p>
+                    </div>
+                </div>
+
+                <!-- Properties Panel -->
+                <div class="panel">
+                    <h3>🔍 Properties</h3>
+                    <div id="propertiesPanel" class="properties-content">
+                        <p>Select an element to view properties</p>
+                    </div>
+                </div>
+
+                <!-- Materials Panel -->
+                <div class="panel">
+                    <h3>🎨 Materials</h3>
+                    <div id="materialsPanel" class="materials-content">
+                        <p>No materials loaded</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span id="elementCount">Elements: 0</span>
+                <span id="vertexCount">Vertices: 0</span>
+                <span id="faceCount">Faces: 0</span>
+            </div>
+            <div class="status-right">
+                <span id="selectedElement">No selection</span>
+                <span id="memoryUsage">Memory: 0 MB</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/chd-loader.js"></script>
+    <script type="module" src="js/three-renderer.js"></script>
+    <script type="module" src="js/ui-controller.js"></script>
+    <script type="module" src="js/viewer-app.js"></script>
+</body>
+</html>

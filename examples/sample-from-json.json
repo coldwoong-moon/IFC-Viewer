@@ -1,0 +1,226 @@
+{
+  "project": {
+    "name": "Sample JSON Building",
+    "description": "Generated sample for JSON to CHD conversion",
+    "units": "meters",
+    "coordinate_system": "local"
+  },
+  "elements": [
+    {
+      "id": "cube_001",
+      "name": "Sample Cube",
+      "type": "generic",
+      "level": "Level 1",
+      "materialId": "sample_material",
+      "vertices": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          3
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          4,
+          7,
+          6
+        ],
+        [
+          0,
+          4,
+          5
+        ],
+        [
+          0,
+          5,
+          1
+        ],
+        [
+          1,
+          5,
+          6
+        ],
+        [
+          1,
+          6,
+          2
+        ],
+        [
+          2,
+          6,
+          7
+        ],
+        [
+          2,
+          7,
+          3
+        ],
+        [
+          3,
+          7,
+          4
+        ],
+        [
+          3,
+          4,
+          0
+        ]
+      ],
+      "properties": {
+        "volume": 1,
+        "area": 6,
+        "material_cost": 50
+      }
+    },
+    {
+      "id": "pyramid_001",
+      "name": "Sample Pyramid",
+      "type": "roof",
+      "level": "Level 2",
+      "materialId": "roof_material",
+      "vertices": [
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          2,
+          0,
+          1
+        ],
+        [
+          2,
+          2,
+          1
+        ],
+        [
+          0,
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          2
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          2,
+          1
+        ],
+        [
+          0,
+          3,
+          2
+        ],
+        [
+          0,
+          1,
+          4
+        ],
+        [
+          1,
+          2,
+          4
+        ],
+        [
+          2,
+          3,
+          4
+        ],
+        [
+          3,
+          0,
+          4
+        ]
+      ],
+      "properties": {
+        "height": 1,
+        "base_area": 4,
+        "slope_angle": 45
+      }
+    }
+  ],
+  "materials": {
+    "sample_material": {
+      "name": "Sample Concrete",
+      "type": "concrete",
+      "properties": {
+        "density": 2400,
+        "strength": 30,
+        "color": [
+          0.8,
+          0.8,
+          0.8,
+          1
+        ]
+      }
+    },
+    "roof_material": {
+      "name": "Roof Tiles",
+      "type": "ceramic",
+      "properties": {
+        "density": 1800,
+        "color": [
+          0.8,
+          0.3,
+          0.2,
+          1
+        ]
+      }
+    }
+  }
+}

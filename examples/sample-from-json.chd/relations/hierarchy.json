@@ -1,0 +1,26 @@
+{
+  "root": {
+    "id": "root",
+    "name": "Project Root",
+    "children": [
+      "level_1",
+      "level_2"
+    ]
+  },
+  "level_1": {
+    "id": "level_1",
+    "name": "Level 1",
+    "parent": "root",
+    "children": [
+      "cube_001"
+    ]
+  },
+  "level_2": {
+    "id": "level_2",
+    "name": "Level 2",
+    "parent": "root",
+    "children": [
+      "pyramid_001"
+    ]
+  }
+}

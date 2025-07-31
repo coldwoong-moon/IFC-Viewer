@@ -1,0 +1,29 @@
+{
+  "root": {
+    "id": "root",
+    "name": "Project Root",
+    "children": [
+      "level_0",
+      "level_1"
+    ]
+  },
+  "level_0": {
+    "id": "level_0",
+    "name": "Level 0",
+    "parent": "root",
+    "children": [
+      "slab_001"
+    ]
+  },
+  "level_1": {
+    "id": "level_1",
+    "name": "Level 1",
+    "parent": "root",
+    "children": [
+      "wall_001",
+      "wall_002",
+      "column_001",
+      "beam_001"
+    ]
+  }
+}
