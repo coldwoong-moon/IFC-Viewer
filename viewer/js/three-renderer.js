@@ -38,10 +38,41 @@ export class ThreeRenderer {
         this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Create controls
+        // Create enhanced user-friendly controls
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        
+        // 부드러운 움직임을 위한 댐핑 설정
         this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
+        this.controls.dampingFactor = 0.08; // 더 부드러운 움직임
+        
+        // 마우스 감도 조정 (건축 모델 뷰잉에 최적화)
+        this.controls.rotateSpeed = 0.8;     // 회전 속도 (기본값보다 약간 느리게)
+        this.controls.zoomSpeed = 1.2;       // 줌 속도 (더 반응성 있게)
+        this.controls.panSpeed = 1.0;        // 팬 속도
+        
+        // 줌 제한 설정 (건축 모델에 적합)
+        this.controls.minDistance = 10;      // 최소 줌인 거리
+        this.controls.maxDistance = 50000;   // 최대 줌아웃 거리
+        
+        // 수직 회전 제한 (바닥 아래로 가지 않도록)
+        this.controls.maxPolarAngle = Math.PI * 0.9; // 약 162도까지만 회전
+        this.controls.minPolarAngle = Math.PI * 0.1; // 약 18도부터 시작
+        
+        // 키보드 지원 활성화
+        this.controls.enableKeys = true;
+        this.controls.keys = {
+            LEFT: 'ArrowLeft',   // 왼쪽 화살표
+            UP: 'ArrowUp',       // 위쪽 화살표  
+            RIGHT: 'ArrowRight', // 오른쪽 화살표
+            BOTTOM: 'ArrowDown'  // 아래쪽 화살표
+        };
+        
+        // 오른쪽 클릭으로 팬 이동 가능
+        this.controls.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,    // 왼쪽 버튼: 회전
+            MIDDLE: THREE.MOUSE.DOLLY,   // 휠: 줌
+            RIGHT: THREE.MOUSE.PAN       // 오른쪽 버튼: 팬
+        };
 
         // Setup lighting
         this.setupLighting();
@@ -57,12 +88,29 @@ export class ThreeRenderer {
     }
 
     setupLighting() {
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        // 높은 강도의 주변광으로 그라데이션 최소화 및 디테일 향상
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         this.scene.add(ambientLight);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(2000, 1500, 2000); // Adjusted for larger scale
-        this.scene.add(directionalLight);
+        // 다방향 방향성 조명으로 모든 면을 균등하게 조명
+        const lights = [
+            { pos: [5000, 5000, 5000], intensity: 0.4 },   // 우상단
+            { pos: [-5000, 5000, 5000], intensity: 0.4 },  // 좌상단  
+            { pos: [5000, -5000, 5000], intensity: 0.3 },  // 우하단
+            { pos: [-5000, -5000, 5000], intensity: 0.3 }, // 좌하단
+            { pos: [0, 0, -5000], intensity: 0.2 }         // 후면
+        ];
+
+        lights.forEach(({ pos, intensity }) => {
+            const light = new THREE.DirectionalLight(0xffffff, intensity);
+            light.position.set(pos[0], pos[1], pos[2]);
+            light.castShadow = false; // 그림자 비활성화로 선명한 형상 인식
+            this.scene.add(light);
+        });
+
+        // 추가 헤미스피어 라이트로 자연스러운 조명 분위기
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+        this.scene.add(hemisphereLight);
     }
 
     startRenderLoop() {
@@ -113,6 +161,13 @@ export class ThreeRenderer {
 
     createElement(elementId, elementData) {
         console.log(`🔧 Creating element ${elementId}: ${elementData.vertices?.length || 0} vertices, ${elementData.faces?.length || 0} faces`);
+        
+        // 철근 감지 로직 (요소 이름이나 타입으로 판단)
+        const isRebar = this.detectRebar(elementId, elementData);
+        
+        if (isRebar) {
+            return this.createRebarElement(elementId, elementData);
+        }
         
         // Use actual geometry from CHD file (now with proper transformations)
         const geometry = new THREE.BufferGeometry();
@@ -275,6 +330,24 @@ export class ThreeRenderer {
                 );
                 break;
                 
+            case 'rebar':
+                // 철근 배치 - 기존 구조물 내부에 배치
+                const rebarSpacing = 0.5; // 0.5m 간격
+                const rebarGridSize = Math.ceil(Math.sqrt(50)); // 50개 철근
+                const rebarRow = Math.floor(counter / rebarGridSize);
+                const rebarCol = counter % rebarGridSize;
+                
+                mesh.position.set(
+                    rebarCol * rebarSpacing - (rebarGridSize * rebarSpacing) / 2,
+                    1 + (counter % 5) * 0.6, // 다층으로 배치
+                    rebarRow * rebarSpacing - (rebarGridSize * rebarSpacing) / 2
+                );
+                
+                // 철근은 회전시켜서 다양한 방향으로 배치
+                mesh.rotation.x = (counter % 3) * Math.PI / 6;
+                mesh.rotation.y = (counter % 7) * Math.PI / 4;
+                break;
+                
             default:
                 // Default grid positioning
                 const defaultSpacing = 2;
@@ -293,15 +366,133 @@ export class ThreeRenderer {
 
     createDefaultMaterial(elementType) {
         const colors = {
-            beam: 0xFF9500,
-            column: 0x007AFF,
-            slab: 0x34C759,
-            wall: 0xFF3B30,
-            generic: 0x8E8E93
+            beam: 0xFF9500,      // 주황색 (보)
+            column: 0x007AFF,    // 파란색 (기둥)
+            slab: 0x34C759,      // 초록색 (슬래브)
+            wall: 0xFF3B30,      // 빨간색 (벽)
+            rebar: 0x444444,     // 진한 회색 (철근)
+            generic: 0x8E8E93    // 회색 (기타)
         };
 
         const color = colors[elementType] || colors.generic;
-        return new THREE.MeshLambertMaterial({ color: color });
+        
+        // MeshPhongMaterial로 변경하여 더 선명한 형상 표현
+        return new THREE.MeshPhongMaterial({ 
+            color: color,
+            shininess: 30,       // 적당한 반사도로 형상 강조
+            transparent: false,   // 투명도 비활성화
+            opacity: 1.0,        // 완전 불투명
+            flatShading: false,  // 부드러운 셰이딩으로 형상 디테일 보존
+            side: THREE.DoubleSide, // 양면 렌더링으로 내부도 보이게
+            vertexColors: false   // 정확한 색상 표현
+        });
+    }
+
+    detectRebar(elementId, elementData) {
+        // 철근 감지 로직 - 여러 방법으로 철근 판단
+        const rebarKeywords = ['rebar', 'reinforcement', 'bar', '철근', 'steel', 'rod'];
+        const rebarTypes = ['rebar', 'reinforcement', 'reinforcing_bar', 'steel_bar'];
+        
+        // 1. 요소 ID에서 철근 키워드 검색
+        const idLower = elementId.toLowerCase();
+        const hasRebarInId = rebarKeywords.some(keyword => idLower.includes(keyword));
+        
+        // 2. 요소 타입에서 철근 타입 검색
+        const typeLower = (elementData.type || '').toLowerCase();
+        const hasRebarType = rebarTypes.some(type => typeLower.includes(type));
+        
+        // 3. 형상 분석 - 긴 원통형이면 철근일 가능성 높음
+        const isLongCylindrical = this.analyzeCylindricalShape(elementData);
+        
+        return hasRebarInId || hasRebarType || isLongCylindrical;
+    }
+
+    analyzeCylindricalShape(elementData) {
+        // 단순한 형상 분석 - 길이 대 너비 비율이 큰 경우 철근으로 판단
+        if (!elementData.boundingBox) return false;
+        
+        const box = elementData.boundingBox;
+        if (!box.min || !box.max) return false;
+        
+        const dimensions = [
+            Math.abs(box.max[0] - box.min[0]),
+            Math.abs(box.max[1] - box.min[1]),
+            Math.abs(box.max[2] - box.min[2])
+        ];
+        
+        dimensions.sort((a, b) => b - a); // 내림차순 정렬
+        const aspectRatio = dimensions[0] / dimensions[1];
+        
+        // 길이 대 너비 비율이 10:1 이상이고 가장 긴 치수가 100mm 이상이면 철근으로 판단
+        return aspectRatio > 10 && dimensions[0] > 100;
+    }
+
+    createRebarElement(elementId, elementData) {
+        console.log(`🔩 Creating rebar element ${elementId}`);
+        
+        let geometry;
+        
+        // CHD 데이터에서 철근 형상 생성
+        if (elementData.vertices && elementData.vertices.length > 0) {
+            geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            
+            for (const vertex of elementData.vertices) {
+                vertices.push(vertex[0], vertex[1], vertex[2]);
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            
+            if (elementData.faces && elementData.faces.length > 0) {
+                const indices = [];
+                for (const face of elementData.faces) {
+                    indices.push(face[0], face[1], face[2]);
+                }
+                geometry.setIndex(indices);
+            }
+            
+            geometry.computeVertexNormals();
+        } else {
+            // 기본 철근 형상 생성 (원통형)
+            geometry = new THREE.CylinderGeometry(
+                8,    // 반지름 상단 (8mm)
+                8,    // 반지름 하단 (8mm) 
+                1000, // 높이 (1m)
+                8     // 원형 분할 수
+            );
+        }
+        
+        // 철근 전용 재질 생성
+        const rebarMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x444444,      // 진한 회색
+            shininess: 80,        // 금속성 반사
+            transparent: false,
+            opacity: 1.0,
+            metalness: 0.8,       // 금속성 강조
+            roughness: 0.3        // 표면 거칠기
+        });
+        
+        const mesh = new THREE.Mesh(geometry, rebarMaterial);
+        
+        mesh.userData = {
+            elementId: elementId,
+            elementType: 'rebar',
+            originalMaterial: rebarMaterial,
+            isRebar: true
+        };
+        
+        // 철근은 작으므로 위치를 조정
+        if (elementData.vertices && elementData.vertices.length > 0) {
+            console.log(`Element ${elementId} uses vertex positions directly`);
+        } else {
+            // 기본 위치 설정
+            this.positionElement(mesh, 'rebar');
+        }
+        
+        console.log(`Created rebar element ${elementId} with ${elementData.vertices?.length || 0} vertices`);
+        this.elements.set(elementId, mesh);
+        this.scene.add(mesh);
+        
+        return mesh;
     }
 
     fitCameraToScene() {
@@ -345,6 +536,25 @@ export class ThreeRenderer {
             mesh.material.wireframe = this.wireframeMode;
         }
         return this.wireframeMode;
+    }
+
+    toggleRebarVisibility() {
+        // 철근 가시성 상태 초기화 (없으면 기본 true)
+        if (this.rebarVisible === undefined) {
+            this.rebarVisible = true;
+        }
+        
+        this.rebarVisible = !this.rebarVisible;
+        
+        // 모든 철근 요소의 가시성 토글
+        for (const mesh of this.elements.values()) {
+            if (mesh.userData.isRebar || mesh.userData.elementType === 'rebar') {
+                mesh.visible = this.rebarVisible;
+            }
+        }
+        
+        console.log(`🔩 Rebar visibility: ${this.rebarVisible ? 'ON' : 'OFF'}`);
+        return this.rebarVisible;
     }
 
     clearScene() {

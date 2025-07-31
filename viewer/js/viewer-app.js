@@ -55,6 +55,7 @@ class ViewerApp {
         this.ui.onResetView = () => this.renderer.resetCamera();
         this.ui.onFitView = () => this.renderer.fitCameraToScene();
         this.ui.onToggleWireframe = () => this.renderer.toggleWireframe();
+        this.ui.onToggleRebar = () => this.renderer.toggleRebarVisibility();
 
         // Renderer to UI communication
         this.renderer.onElementSelect = (elementId) => {

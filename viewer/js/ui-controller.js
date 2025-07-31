@@ -21,6 +21,7 @@ export class UIController {
             resetViewBtn: document.getElementById('resetViewBtn'),
             fitViewBtn: document.getElementById('fitViewBtn'),
             wireframeBtn: document.getElementById('wireframeBtn'),
+            rebarToggleBtn: document.getElementById('rebarToggleBtn'),
             fullscreenBtn: document.getElementById('fullscreenBtn'),
             modelInfo: document.getElementById('modelInfo'),
             elementList: document.getElementById('elementList'),
@@ -107,6 +108,13 @@ export class UIController {
             if (this.onToggleWireframe) {
                 const isWireframe = this.onToggleWireframe();
                 this.elements.wireframeBtn.classList.toggle('active', isWireframe);
+            }
+        });
+
+        this.elements.rebarToggleBtn.addEventListener('click', () => {
+            if (this.onToggleRebar) {
+                const isRebarVisible = this.onToggleRebar();
+                this.elements.rebarToggleBtn.classList.toggle('active', isRebarVisible);
             }
         });
 
