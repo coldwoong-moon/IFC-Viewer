@@ -170,6 +170,28 @@ class ViewerApp {
             throw new Error('No model data received');
         }
 
+        // IFC 파일이 CHD 프로젝트로 변환된 경우 특별 처리
+        if (model.isProjectCreated && model.conversionInfo) {
+            console.log('🎯 IFC file converted to CHD project');
+            
+            // 사용자에게 프로젝트 생성 알림
+            const message = model.conversionInfo.message || 'CHD 프로젝트가 생성되었습니다.';
+            this.ui.showInfo(message + ' 프로젝트 목록을 새로고침합니다.');
+            
+            // 프로젝트 목록 새로고침
+            setTimeout(() => {
+                this.ui.loadProjectList();
+            }, 1000);
+            
+            // 빈 모델 표시 (geometry가 없으므로)
+            this.ui.updateFileInfo(fileName, model.statistics || {});
+            if (model.conversionInfo) {
+                this.ui.showConversionInfo(model.conversionInfo);
+            }
+            
+            return; // 3D 렌더링은 하지 않음
+        }
+
         console.log(`📝 Model has ${Object.keys(model.geometry || {}).length} geometry chunks`);
         this.currentModel = model;
 

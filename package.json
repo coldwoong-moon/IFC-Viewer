@@ -10,7 +10,8 @@
     "build": "node scripts/build.js",
     "convert": "node tools/converters/index.js",
     "serve": "node tools/viewers/server.js",
-    "viewer": "node viewer/server.js"
+    "viewer": "node --max-old-space-size=8192 viewer/server.js",
+    "viewer-large": "node --max-old-space-size=16384 viewer/server.js"
   },
   "keywords": [
     "BIM",

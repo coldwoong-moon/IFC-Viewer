@@ -405,6 +405,11 @@ export class UIController {
         alert(`Error: ${message}`);
     }
 
+    showInfo(message) {
+        // Simple info display - could be enhanced with a modal
+        alert(`Info: ${message}`);
+    }
+
     showConversionInfo(conversionInfo) {
         // Create conversion info notification
         const notification = document.createElement('div');

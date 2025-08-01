@@ -77,6 +77,25 @@ export class CHDLoader {
                 console.log('Conversion info:', data.conversionInfo);
             }
             
+            // IFC 파일이 CHD 프로젝트로 변환된 경우 특별 처리
+            if (isIFC && data.conversionInfo && data.conversionInfo.projectCreated) {
+                // 프로젝트 생성 알림을 위한 특별한 모델 반환
+                const notificationModel = {
+                    format: data.format || 'CHD',
+                    version: data.version || '1.0',
+                    project: data.project || {},
+                    geometry: {}, // 빈 geometry
+                    attributes: data.attributes || {},
+                    statistics: data.statistics || {},
+                    conversionInfo: data.conversionInfo,
+                    projectInfo: data.projectInfo,
+                    isProjectCreated: true
+                };
+                
+                this.model = notificationModel;
+                return notificationModel;
+            }
+            
             const model = this.processServerResponse(data);
             
             // Add conversion info to model if available

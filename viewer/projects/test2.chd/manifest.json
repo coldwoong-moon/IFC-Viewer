@@ -1,0 +1,45 @@
+{
+  "format": "CHD",
+  "version": "1.0",
+  "created": "2025-01-31T00:00:00.000Z",
+  "project": {
+    "name": "Test Demo Building",
+    "description": "Demonstration CHD project for viewer testing",
+    "units": "millimeters",
+    "coordinate_system": "local",
+    "bounding_box": {
+      "min": [-500, -500, -100],
+      "max": [500, 500, 400]
+    }
+  },
+  "index": {
+    "geometry_chunks": [
+      {
+        "id": "001",
+        "file": "geometry/chunk_001.bin",
+        "elements": 33,
+        "vertices": 264,
+        "faces": 396,
+        "size": 8000
+      }
+    ],
+    "attributes": {
+      "materials": "attributes/materials.cbor",
+      "properties": "attributes/properties.cbor"
+    },
+    "relations": {
+      "hierarchy": "relations/hierarchy.json"
+    }
+  },
+  "compression": {
+    "type": "zlib",
+    "level": 6
+  },
+  "statistics": {
+    "total_elements": 33,
+    "total_vertices": 264,
+    "total_faces": 396,
+    "total_chunks": 1,
+    "file_size": 15000
+  }
+}
