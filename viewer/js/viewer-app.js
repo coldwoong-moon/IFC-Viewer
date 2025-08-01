@@ -183,13 +183,19 @@ class ViewerApp {
                 this.ui.loadProjectList();
             }, 1000);
             
-            // 빈 모델 표시 (geometry가 없으므로)
-            this.ui.updateFileInfo(fileName, model.statistics || {});
+            // 변환 정보 표시
             if (model.conversionInfo) {
                 this.ui.showConversionInfo(model.conversionInfo);
             }
             
-            return; // 3D 렌더링은 하지 않음
+            // 변환된 프로젝트가 있으면 자동으로 로드하여 3D 렌더링
+            if (model.conversionInfo && model.conversionInfo.projectName) {
+                console.log('🔄 Auto-loading converted project for 3D rendering...');
+                setTimeout(() => {
+                    this.loadProject(model.conversionInfo.projectName);
+                }, 1500);
+                return;
+            }
         }
 
         console.log(`📝 Model has ${Object.keys(model.geometry || {}).length} geometry chunks`);
